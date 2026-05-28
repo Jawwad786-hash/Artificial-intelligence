@@ -1,186 +1,439 @@
-import datetime
-import threading
-import tkinter as tk
-from tkinter import filedialog, messagebox, scrolledtext
-from gpt4all import GPT4All
+from flask import Flask, render_template_string, request
+import random
 
-# =========================================================
-# LOAD AI MODEL
-# =========================================================
-# Pro-Tip: Loading large models can freeze the window startup. 
-# For an assignment, keep it global or load it behind a loading screen.
-try:
-    chatbot = GPT4All(
-        model_name="orca-mini-3b-gguf2-q4_0.gguf",
-        model_path=".",
-        allow_download=False,
-        device="cpu"
-    )
-except Exception as e:
-    print(f"Model initialization failed: {e}")
-    chatbot = None
+app = Flask(__name__)
 
-# =========================================================
-# WINDOW SETUP
-# =========================================================
-root = tk.Tk()
-root.title("Offline AI Chatbot")
-root.geometry("1000x750")
-root.configure(bg="#121212")
+# ==========================================
+# FITNESS CHATBOT RESPONSES
+# ==========================================
 
-dark_mode = True
+responses = {
 
-# =========================================================
-# THEME TOGGLE OPTIMIZATION
-# =========================================================
-def toggle_theme():
-    global dark_mode
-    dark_mode = not dark_mode
-    
-    # Using dictionaries keeps styling clean and scalable instead of messy chains of .config()
-    theme = {
-        "root_bg": "#121212" if dark_mode else "#f0f0f0",
-        "title_fg": "#00ffff" if dark_mode else "#0000aa",
-        "input_bg": "#2b2b2b" if dark_mode else "white",
-        "input_fg": "white" if dark_mode else "black",
-        "chat_bg": "#1e1e1e" if dark_mode else "white",
-        "chat_fg": "white" if dark_mode else "black",
-        "insert_color": "white" if dark_mode else "black"
+    "hi": "👋 Hey Fitness Warrior! Welcome to FitBot. Ask me anything about workouts, diet, gym, fitness or weight loss!",
+
+    "hello": "🔥 Ready to transform yourself? Let's go!",
+
+    "weight loss": """
+🔥 Weight Loss Tips:
+• Drink more water
+• Avoid sugar & junk food
+• Walk daily
+• Increase protein intake
+• Sleep properly
+""",
+
+    "weight gain": """
+🍗 Weight Gain Tips:
+• Eat more calories
+• Strength training
+• Protein-rich foods
+• Healthy smoothies
+""",
+
+    "diet": """
+🥗 Diet Plan:
+Breakfast → Oats & Fruits
+Lunch → Rice + Protein
+Snacks → Nuts & Juice
+Dinner → Light Protein Meal
+""",
+
+    "abs": """
+🏋️ Abs Workout:
+• Crunches
+• Leg Raises
+• Plank
+• Mountain Climbers
+""",
+
+    "chest": """
+💪 Chest Workout:
+• Pushups
+• Bench Press
+• Dumbbell Fly
+• Incline Press
+""",
+
+    "biceps": """
+💪 Biceps Workout:
+• Dumbbell Curls
+• Hammer Curls
+• Barbell Curls
+""",
+
+    "legs": """
+🦵 Leg Workout:
+• Squats
+• Lunges
+• Leg Press
+• Calf Raises
+""",
+
+    "cardio": """
+🏃 Best Cardio:
+• Running
+• Cycling
+• Jump Rope
+• Burpees
+""",
+
+    "protein": """
+🥚 Protein Foods:
+• Eggs
+• Chicken
+• Paneer
+• Fish
+• Nuts
+""",
+
+    "gym": """
+🏋️ Weekly Gym Routine:
+Day 1 → Chest
+Day 2 → Back
+Day 3 → Legs
+Day 4 → Shoulders
+Day 5 → Arms
+""",
+
+    "motivation": random.choice([
+        "🔥 Discipline beats motivation.",
+        "🏆 Train insane or remain the same.",
+        "💪 Every workout counts.",
+        "🚀 Small progress is still progress."
+    ]),
+
+    "shoulder": """
+🏋️ Shoulder Workout:
+• Shoulder Press
+• Lateral Raises
+• Front Raises
+• Arnold Press
+""",
+
+    "back": """
+💥 Back Workout:
+• Pull Ups
+• Deadlifts
+• Lat Pulldown
+• Seated Row
+""",
+
+    "triceps": """
+💪 Triceps Workout:
+• Tricep Pushdown
+• Dips
+• Skull Crushers
+• Close Grip Pushups
+""",
+
+    "beginner": """
+🌟 Beginner Fitness Tips:
+• Start with light workouts
+• Focus on consistency
+• Eat healthy
+• Stay hydrated
+• Warm up properly
+""",
+
+    "home workout": """
+🏠 Home Workout Plan:
+• Pushups
+• Squats
+• Plank
+• Jumping Jacks
+• Lunges
+""",
+
+    "calories": """
+🔥 Calories Guide:
+• Weight loss → Calorie deficit
+• Weight gain → Calorie surplus
+• Protein is important for muscle growth
+""",
+
+    "supplements": """
+💊 Popular Supplements:
+• Whey Protein
+• Creatine
+• Multivitamins
+• Fish Oil
+""",
+
+    "stretching": """
+🤸 Stretching Benefits:
+• Improves flexibility
+• Reduces injury risk
+• Improves blood flow
+• Relaxes muscles
+""",
+
+    "warm up": """
+🔥 Warm Up Exercises:
+• Jumping Jacks
+• Arm Circles
+• High Knees
+• Light Jogging
+""",
+
+    "cool down": """
+❄️ Cool Down Tips:
+• Deep breathing
+• Light stretching
+• Walk slowly
+• Drink water
+""",
+
+    "water": """
+💧 Water Intake:
+• Drink 3-4 litres daily
+• More during workouts
+• Stay hydrated throughout the day
+""",
+
+    "sleep": """
+😴 Sleep Tips:
+• Sleep 7-8 hours daily
+• Avoid screens before bed
+• Sleep at consistent times
+""",
+
+    "running": """
+🏃 Running Benefits:
+• Burns calories
+• Improves stamina
+• Good for heart health
+• Reduces stress
+""",
+
+    "yoga": """
+🧘 Yoga Benefits:
+• Better flexibility
+• Stress relief
+• Improved balance
+• Better breathing
+""",
+
+    "fitness": """
+💪 Fitness Basics:
+• Exercise regularly
+• Eat healthy food
+• Stay consistent
+• Sleep properly
+• Stay motivated
+"""
+}
+
+# ==========================================
+# MODERN HTML UI
+# ==========================================
+
+html = '''
+<!DOCTYPE html>
+<html>
+<head>
+
+<title>FitBot</title>
+
+<style>
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+body{
+    font-family:Arial;
+    background:linear-gradient(135deg,#0f172a,#1e293b,#111827);
+    height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    overflow:hidden;
+}
+
+.container{
+    width:80%;
+    max-width:900px;
+    background:rgba(255,255,255,0.08);
+    backdrop-filter:blur(10px);
+    border-radius:25px;
+    padding:25px;
+    box-shadow:0px 0px 30px rgba(0,0,0,0.6);
+}
+
+.header{
+    text-align:center;
+    margin-bottom:20px;
+}
+
+.header h1{
+    color:#38bdf8;
+    font-size:42px;
+}
+
+.header p{
+    color:white;
+    margin-top:10px;
+}
+
+.chatbox{
+    background:#020617;
+    height:450px;
+    overflow-y:auto;
+    border-radius:20px;
+    padding:20px;
+    border:2px solid #38bdf8;
+}
+
+.user-msg{
+    background:#38bdf8;
+    color:black;
+    padding:12px 18px;
+    border-radius:20px;
+    margin:15px 0;
+    width:fit-content;
+    margin-left:auto;
+    font-weight:bold;
+}
+
+.bot-msg{
+    background:#1e293b;
+    color:white;
+    padding:15px;
+    border-radius:20px;
+    margin:15px 0;
+    width:fit-content;
+    max-width:80%;
+    white-space:pre-line;
+}
+
+form{
+    display:flex;
+    margin-top:20px;
+    gap:10px;
+}
+
+input{
+    flex:1;
+    padding:15px;
+    border:none;
+    border-radius:15px;
+    font-size:16px;
+    outline:none;
+    background:#e2e8f0;
+}
+
+button{
+    padding:15px 25px;
+    border:none;
+    border-radius:15px;
+    background:#38bdf8;
+    color:black;
+    font-weight:bold;
+    cursor:pointer;
+    transition:0.3s;
+}
+
+button:hover{
+    background:#0ea5e9;
+    transform:scale(1.05);
+}
+
+.suggestions{
+    margin-top:15px;
+    color:#cbd5e1;
+    text-align:center;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<div class="header">
+    <h1>💪 FitBot</h1>
+    <p>Your Personal Fitness Assistant</p>
+</div>
+
+<div class="chatbox">
+
+{% for chat in chats %}
+
+<div class="user-msg">
+{{ chat.user }}
+</div>
+
+<div class="bot-msg">
+{{ chat.bot }}
+</div>
+
+{% endfor %}
+
+</div>
+
+<form method="POST">
+
+<input type="text" name="message" placeholder="Ask about workouts, diet, gym..." required>
+
+<button type="submit">Send</button>
+
+</form>
+
+<div class="suggestions">
+Try: hi, chest workout, abs, cardio, diet, protein, motivation
+</div>
+
+</div>
+
+</body>
+</html>
+'''
+
+# ==========================================
+# CHAT STORAGE
+# ==========================================
+
+chat_history = [
+    {
+        "user": "Hello",
+        "bot": "👋 Welcome to FitBot! Ask me anything about workouts, fitness, gym or diet plans."
     }
+]
 
-    root.configure(bg=theme["root_bg"])
-    title.config(bg=theme["root_bg"], fg=theme["title_fg"])
-    top_frame.config(bg=theme["root_bg"])
-    input_frame.config(bg=theme["root_bg"])
-    
-    user_input.config(bg=theme["input_bg"], fg=theme["input_fg"], insertbackground=theme["insert_color"])
-    chat_area.config(bg=theme["chat_bg"], fg=theme["chat_fg"], insertbackground=theme["insert_color"])
+# ==========================================
+# MAIN ROUTE
+# ==========================================
 
-# =========================================================
-# GUI COMPONENT LAYOUT
-# =========================================================
-title = tk.Label(root, text="OFFLINE AI CHATBOT", font=("Arial", 24, "bold"), bg="#121212", fg="#00ffff")
-title.pack(pady=10)
+@app.route('/', methods=['GET', 'POST'])
+def home():
 
-top_frame = tk.Frame(root, bg="#121212")
-top_frame.pack(fill=tk.X, padx=10)
+    if request.method == 'POST':
 
-# UI Elements
-chat_area = scrolledtext.ScrolledText(root, wrap=tk.WORD, font=("Consolas", 13), bg="#1e1e1e", fg="white", insertbackground="white")
-chat_area.pack(padx=15, pady=10, fill=tk.BOTH, expand=True)
+        user_message = request.form['message'].lower()
 
-# Define Custom Text Tags for clean handling of dynamic lines
-chat_area.tag_config("typing", foreground="#ffaa00") 
-chat_area.insert(tk.END, "🤖 Bot: Hello! I am your Offline AI Assistant.\n\n")
+        bot_reply = "❌ Sorry, I don't understand. Try asking about workouts, diet, abs, chest, gym or cardio."
 
-input_frame = tk.Frame(root, bg="#121212")
-input_frame.pack(fill=tk.X, padx=10, pady=10)
+        for key in responses:
 
-user_input = tk.Entry(input_frame, font=("Arial", 14), bg="#2b2b2b", fg="white", insertbackground="white")
-user_input.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10), ipady=8)
+            if key in user_message:
 
-# =========================================================
-# CORE FUNCTIONS (THINK THREAD-SAFETY!)
-# =========================================================
+                bot_reply = responses[key]
+                break
 
-def append_to_chat(text, tag=None):
-    """Safe helper function to modify Tkinter text space from any thread."""
-    chat_area.config(state=tk.NORMAL)
-    if tag:
-        chat_area.insert(tk.END, text, tag)
-    else:
-        chat_area.insert(tk.END, text)
-    chat_area.config(state=tk.DISABLED) # Prevents user from manually typing inside chat area
-    chat_area.yview(tk.END)
+        chat_history.append({
+            'user': user_message,
+            'bot': bot_reply
+        })
 
-def remove_typing_status():
-    """Removes the typing status text safely using targeted indexing."""
-    chat_area.config(state=tk.NORMAL)
-    # Search for our custom tagged string block and drop it out cleanly
-    ranges = chat_area.tag_ranges("typing")
-    if ranges:
-        chat_area.delete(ranges[0], ranges[1])
-    chat_area.config(state=tk.DISABLED)
+    return render_template_string(html, chats=chat_history)
 
-def save_chat():
-    content = chat_area.get("1.0", tk.END)
-    file = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text Files", "*.txt")])
-    if file:
-        with open(file, "w", encoding="utf-8") as f:
-            f.write(content)
-        messagebox.showinfo("Saved", "Chat saved successfully!")
+# ==========================================
+# RUN APP
+# ==========================================
 
-def clear_chat():
-    chat_area.config(state=tk.NORMAL)
-    chat_area.delete("1.0", tk.END)
-    chat_area.config(state=tk.DISABLED)
-    append_to_chat("🤖 Bot: Chat cleared successfully.\n\n")
-
-# =========================================================
-# ASYNCHRONOUS BACKEND PROCESSING
-# =========================================================
-
-def process_message_worker(message, timestamp):
-    """Runs inside background thread. No direct Tkinter manipulation here!"""
-    if not chatbot:
-        root.after(0, remove_typing_status)
-        root.after(0, lambda: append_to_chat("❌ Error: AI Model was not initialized properly.\n\n"))
-        return
-
-    try:
-        # Generates AI response safely off-screen
-        response = chatbot.generate(
-            prompt=message,
-            max_tokens=200,
-            temp=0.7
-        )
-        
-        # Scheduling safely back onto main Tkinter UI thread loops using root.after
-        root.after(0, remove_typing_status)
-        root.after(0, lambda: append_to_chat(f"🤖 Bot [{timestamp}]: {response}\n\n"))
-        
-    except Exception as e:
-        root.after(0, remove_typing_status)
-        root.after(0, lambda: append_to_chat(f"❌ Error during generation:\n{e}\n\n"))
-
-def send_message():
-    message = user_input.get().strip()
-    if not message: 
-        return # Optimization: Instantly drops out before waking up thread cycles unnecessarily
-        
-    timestamp = datetime.datetime.now().strftime("%H:%M:%S")
-    
-    # Process immediate GUI updates on main thread
-    append_to_chat(f"🧑 You [{timestamp}]: {message}\n\n")
-    append_to_chat("🤖 Bot is typing...\n\n", tag="typing")
-    user_input.delete(0, tk.END)
-    
-    # Pass off heavy computational lifting safely to daemon thread
-    threading.Thread(
-        target=process_message_worker,
-        args=(message, timestamp),
-        daemon=True
-    ).start()
-
-# =========================================================
-# BUTTONS & BINDINGS
-# =========================================================
-theme_button = tk.Button(top_frame, text="Toggle Theme", font=("Arial", 11, "bold"), bg="#444", fg="white", command=toggle_theme)
-theme_button.pack(side=tk.LEFT, padx=5)
-
-clear_button = tk.Button(top_frame, text="Clear Chat", font=("Arial", 11, "bold"), bg="#aa0000", fg="white", command=clear_chat)
-clear_button.pack(side=tk.LEFT, padx=5)
-
-save_button = tk.Button(top_frame, text="Save Chat", font=("Arial", 11, "bold"), bg="#0066cc", fg="white", command=save_chat)
-save_button.pack(side=tk.LEFT, padx=5)
-
-send_button = tk.Button(input_frame, text="Send", font=("Arial", 12, "bold"), bg="#00aa00", fg="white", width=12, command=send_message)
-send_button.pack(side=tk.RIGHT)
-
-root.bind("<Return>", lambda event: send_message())
-
-# Initialize text widget settings
-chat_area.config(state=tk.DISABLED)
-
-if __name__ == "__main__":
-    root.mainloop()
+if __name__ == '__main__':
+    app.run(debug=True)
